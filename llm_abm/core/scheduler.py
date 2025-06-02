@@ -27,7 +27,7 @@ def execute_step(model):
 
 def execute_rule(model, rule_name, params):
     """
-    Execute a specific rule
+    Execute a specific rule (built-in or custom)
     
     Args:
         model: Model dictionary
@@ -41,9 +41,10 @@ def execute_rule(model, rule_name, params):
     from ..rules.movement import random_movement
     from ..rules.interaction import predator_prey
     from ..rules.lifecycle import energy_decay, reproduction, death
+    from .rule_engine import rule_engine, execute_custom_rule
     
-    # Rule dispatch table
-    rule_functions = {
+    # Built-in rule dispatch table
+    built_in_rules = {
         "random_movement": random_movement,
         "predator_prey": predator_prey,
         "energy_decay": energy_decay,
@@ -51,9 +52,17 @@ def execute_rule(model, rule_name, params):
         "death": death
     }
     
-    if rule_name not in rule_functions:
-        raise ValueError(f"Unknown rule: {rule_name}")
+    # Check if it's a built-in rule
+    if rule_name in built_in_rules:
+        rule_function = built_in_rules[rule_name]
+        return rule_function(model, params)
     
-    # Execute the rule function
-    rule_function = rule_functions[rule_name]
-    return rule_function(model, params)
+    # Check if it's a custom rule
+    try:
+        return execute_custom_rule(model, rule_name, params)
+    except ValueError:
+        pass
+    
+    # Rule not found
+    available_rules = list(built_in_rules.keys()) + list(rule_engine.list_rules().keys())
+    raise ValueError(f"Unknown rule: {rule_name}. Available rules: {available_rules}")

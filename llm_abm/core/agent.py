@@ -21,11 +21,16 @@ def add_rule(model, rule_name, params=None):
     # Create copy to avoid mutation
     new_model = copy.deepcopy(model)
     
-    # Validate rule name
-    valid_rules = {
+    # Validate rule name (check both built-in and custom rules)
+    built_in_rules = {
         "random_movement", "predator_prey", "energy_decay", 
         "reproduction", "death"
     }
+    
+    # Import rule engine to check for custom rules
+    from .rule_engine import rule_engine
+    custom_rules = set(rule_engine.list_rules().keys())
+    valid_rules = built_in_rules | custom_rules
     
     if rule_name not in valid_rules:
         raise ValueError(f"Unknown rule: {rule_name}. Available rules: {valid_rules}")

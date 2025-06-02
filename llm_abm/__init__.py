@@ -8,9 +8,10 @@ All functions are pure with predictable inputs/outputs, using simple dictionarie
 from .core.model import create_model, step, run
 from .core.agent import add_rule
 from .utils.export import export, run_stream, export_stream_json, export_stream_csv
+from .core.rule_engine import add_custom_rule, rule_engine
 
 __version__ = "0.1.0"
-__all__ = ["create_model", "add_rule", "step", "run", "export", "run_stream", "export_stream_json", "export_stream_csv"]
+__all__ = ["create_model", "add_rule", "step", "run", "export", "run_stream", "export_stream_json", "export_stream_csv", "add_custom_rule", "list_custom_rules"]
 
 # Main API - exactly 5 functions as specified
 def create_model(config):
@@ -52,3 +53,13 @@ def export_stream_csv(stream_states):
     """Convert stream states to CSV format"""
     from .utils.export import export_stream_csv as _export_stream_csv
     return _export_stream_csv(stream_states)
+
+def add_custom_rule(model, rule_name, rule_definition, rule_type="code"):
+    """Add a custom rule from LLM-generated code or DSL"""
+    from .core.rule_engine import add_custom_rule as _add_custom_rule
+    return _add_custom_rule(model, rule_name, rule_definition, rule_type)
+
+def list_custom_rules():
+    """List all custom rules with metadata"""
+    from .core.rule_engine import rule_engine
+    return rule_engine.list_rules()
