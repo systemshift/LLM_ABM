@@ -9,9 +9,10 @@ from .core.model import create_model, step, run
 from .core.agent import add_rule
 from .utils.export import export, run_stream, export_stream_json, export_stream_csv
 from .core.rule_engine import add_custom_rule, rule_engine
+from .docs import get_system_prompt_docs, get_rule_reference
 
 __version__ = "0.1.0"
-__all__ = ["create_model", "add_rule", "step", "run", "export", "run_stream", "export_stream_json", "export_stream_csv", "add_custom_rule", "list_custom_rules"]
+__all__ = ["create_model", "add_rule", "step", "run", "export", "run_stream", "export_stream_json", "export_stream_csv", "add_custom_rule", "list_custom_rules", "get_system_prompt_docs", "get_rule_reference"]
 
 # Main API - exactly 5 functions as specified
 def create_model(config):
@@ -63,3 +64,13 @@ def list_custom_rules():
     """List all custom rules with metadata"""
     from .core.rule_engine import rule_engine
     return rule_engine.list_rules()
+
+def get_system_prompt_docs():
+    """Get complete LLM-ABM documentation for system prompts (≤2K tokens)"""
+    from .docs import get_system_prompt_docs as _get_docs
+    return _get_docs()
+
+def get_rule_reference():
+    """Get quick rule reference for LLMs (≤1K tokens)"""
+    from .docs import get_rule_reference as _get_ref
+    return _get_ref()
