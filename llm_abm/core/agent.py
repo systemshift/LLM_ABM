@@ -23,8 +23,8 @@ def add_rule(model, rule_name, params=None):
     
     # Validate rule name (check both built-in and custom rules)
     built_in_rules = {
-        "random_movement", "predator_prey", "energy_decay", 
-        "reproduction", "death"
+        "random_movement", "directed_movement", "flocking",
+        "predator_prey", "energy_decay", "reproduction", "death"
     }
     
     # Import rule engine to check for custom rules

@@ -38,7 +38,7 @@ def execute_rule(model, rule_name, params):
         model: Updated model dictionary
     """
     # Import rule functions dynamically
-    from ..rules.movement import random_movement
+    from ..rules.movement import random_movement, directed_movement, flocking
     from ..rules.interaction import predator_prey
     from ..rules.lifecycle import energy_decay, reproduction, death
     from .rule_engine import rule_engine, execute_custom_rule
@@ -46,6 +46,8 @@ def execute_rule(model, rule_name, params):
     # Built-in rule dispatch table
     built_in_rules = {
         "random_movement": random_movement,
+        "directed_movement": directed_movement,
+        "flocking": flocking,
         "predator_prey": predator_prey,
         "energy_decay": energy_decay,
         "reproduction": reproduction,
