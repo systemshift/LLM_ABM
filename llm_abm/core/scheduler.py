@@ -39,19 +39,22 @@ def execute_rule(model, rule_name, params):
     """
     # Import rule functions dynamically
     from ..rules.movement import random_movement, directed_movement, flocking
-    from ..rules.interaction import predator_prey
-    from ..rules.lifecycle import energy_decay, reproduction, death
+    from ..rules.interaction import predator_prey, grazing, competition
+    from ..rules.lifecycle import energy_decay, reproduction, death, aging
     from .rule_engine import rule_engine, execute_custom_rule
-    
+
     # Built-in rule dispatch table
     built_in_rules = {
         "random_movement": random_movement,
         "directed_movement": directed_movement,
         "flocking": flocking,
         "predator_prey": predator_prey,
+        "grazing": grazing,
+        "competition": competition,
         "energy_decay": energy_decay,
         "reproduction": reproduction,
-        "death": death
+        "death": death,
+        "aging": aging
     }
     
     # Check if it's a built-in rule

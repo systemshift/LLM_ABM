@@ -52,14 +52,20 @@ config = {
 - `directed_movement` - Chase targets: `{"species": "wolf", "target": "rabbit"}`
 
 **Interactions:**
-- `predator_prey` - Hunting: `{"predator": "wolf", "prey": "rabbit", "success_rate": 0.8}`
+- `predator_prey` - Hunting: `{"predator": "wolf", "prey": "rabbit", "success_rate": 0.5, "energy_gain": 10}`
+- `grazing` - Herbivores gain energy: `{"species": "rabbit", "energy_gain": 2, "probability": 0.7}`
 - `competition` - Resource competition: `{"species": ["rabbit"], "energy_per_resource": 5}`
 
 **Lifecycle:**
-- `energy_decay` - Energy loss: `{"species": "all", "rate": 1}`
-- `reproduction` - Breeding: `{"species": "rabbit", "energy_threshold": 30, "rate": 0.1}`
+- `energy_decay` - Energy loss: `{"species": "all", "rate": 0.8}`
+- `reproduction` - Breeding: `{"species": "rabbit", "energy_threshold": 30, "rate": 0.08}`
 - `death` - Death at zero energy: `{}`
 - `aging` - Age-based death: `{"death_age": 100}`
+
+**Balance Tips:**
+- Prey MUST gain energy (use `grazing`) or they die
+- Lower predation success (0.4-0.5) for sustainable populations
+- Match energy_decay rate to energy_gain for equilibrium
 
 ## Custom Rules (Advanced)
 ```python
@@ -82,26 +88,28 @@ rule_dsl = {
 model = abm.add_custom_rule(model, "foraging", rule_dsl, "dsl")
 ```
 
-## Complete Example
+## Complete Example (BALANCED)
 ```python
-# Predator-prey with reproduction
+# Sustainable predator-prey ecosystem
 config = {
     "grid": {"width": 30, "height": 30},
     "agents": {
-        "rabbit": {"count": 80, "energy": 20},
+        "rabbit": {"count": 80, "energy": 25},
         "wolf": {"count": 15, "energy": 40}
     }
 }
 
 model = abm.create_model(config)
 model = abm.add_rule(model, "random_movement", {})
-model = abm.add_rule(model, "predator_prey", {"predator": "wolf", "prey": "rabbit"})
-model = abm.add_rule(model, "reproduction", {"species": "rabbit", "energy_threshold": 30})
-model = abm.add_rule(model, "energy_decay", {"rate": 1})
+model = abm.add_rule(model, "grazing", {"species": "rabbit", "energy_gain": 1.5})  # KEY: Rabbits gain energy!
+model = abm.add_rule(model, "predator_prey", {"predator": "wolf", "prey": "rabbit", "success_rate": 0.4, "energy_gain": 10})
+model = abm.add_rule(model, "reproduction", {"species": "rabbit", "energy_threshold": 30, "rate": 0.08})
+model = abm.add_rule(model, "reproduction", {"species": "wolf", "energy_threshold": 50, "rate": 0.04})
+model = abm.add_rule(model, "energy_decay", {"rate": 0.8})  # Reduced from 1
 model = abm.add_rule(model, "death", {})
 
 results = abm.run(model, steps=200)
-print(f"Final: {results['summary']['final_counts']}")
+print(f"Final: {results['summary']['final_counts']}")  # Both populations survive!
 ```
 
 ## Data Structures
@@ -133,11 +141,17 @@ def get_rule_reference():
   - `species`: Agent type that moves
   - `target`: Target agent type
 
-## Interaction Rules  
+## Interaction Rules
 - **predator_prey**: Hunting with energy transfer
   - `predator`: Predator agent type
-  - `prey`: Prey agent type  
-  - `success_rate`: Hunt success probability (default: 0.8)
+  - `prey`: Prey agent type
+  - `success_rate`: Hunt success probability (default: 0.5)
+  - `energy_gain`: Fixed energy gained per kill (default: 10)
+
+- **grazing**: Herbivores gain energy from environment
+  - `species`: Agent type that grazes
+  - `energy_gain`: Energy gained per step (default: 2)
+  - `probability`: Chance of successful grazing (default: 0.7)
 
 - **competition**: Resource competition between species
   - `species`: List of competing agent types
@@ -146,12 +160,12 @@ def get_rule_reference():
 ## Lifecycle Rules
 - **energy_decay**: Reduce energy each step
   - `species`: "all" or agent type (default: "all")
-  - `rate`: Energy loss per step (default: 1)
+  - `rate`: Energy loss per step (default: 0.8, was 1)
 
 - **reproduction**: Spawn offspring when energy threshold met
   - `species`: Agent type that reproduces
   - `energy_threshold`: Min energy to reproduce (default: 30)
-  - `rate`: Reproduction probability (default: 0.1)
+  - `rate`: Reproduction probability (default: 0.08, typical range: 0.04-0.15)
 
 - **death**: Kill agents when energy reaches zero
   - `species`: "all" or agent type (default: "all")
