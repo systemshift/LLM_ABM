@@ -5,9 +5,9 @@ Action processor for handling agent actions and interactions
 import random
 import copy
 from typing import Dict, Any, List, Optional
-from .agent_system import Agent, AgentManager
+from .agent import Agent, AgentManager
 from .environment import Environment
-from .event_logger import EventLogger
+from .logger import EventLogger
 
 
 class ActionProcessor:

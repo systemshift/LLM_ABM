@@ -3,27 +3,19 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "llm-abm"
-version = "0.3.0"
-description = "Agent-based modeling library with optional LLM-powered simulation generation"
+name = "agentstan"
+version = "0.1.0"
+description = "AI-native agent-based modeling framework. Simulate, Test, Analyze, Narrate."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
-authors = [
-    {name = "LLM-ABM Contributors"}
-]
-keywords = ["agent-based-modeling", "abm", "simulation", "llm", "ai", "openai"]
+keywords = ["agent-based-modeling", "abm", "simulation", "llm", "ai", "framework"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -31,27 +23,23 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-chat = [
+ai = [
     "openai>=1.0",
 ]
 dev = [
     "pytest>=7.0",
-    "pytest-cov>=4.0",
 ]
 
 [project.scripts]
-llm-abm = "llm_abm.__main__:main"
+agentstan = "agentstan.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/systemshift/llm-abm"
-Repository = "https://github.com/systemshift/llm-abm"
+Homepage = "https://github.com/systemshift/agentstan"
+Repository = "https://github.com/systemshift/agentstan"
 
 [tool.setuptools]
-packages = ["llm_abm", "llm_abm.core"]
-
-[tool.setuptools.package-data]
-llm_abm = ["py.typed"]
+packages = ["agentstan", "agentstan.core", "agentstan.experiment", "agentstan.analysis", "agentstan.ai"]
 
 [tool.pytest.ini_options]
-testpaths = ["."]
+testpaths = ["tests"]
 python_files = ["test_*.py"]

@@ -1,178 +1,148 @@
-# LLM-ABM: Agent-Based Modeling Library for LLMs
+# AgentStan
 
-A functional, documentation-first ABM library designed specifically for LLM code generation. Features pure functions with predictable inputs/outputs, using simple dictionaries for all state management.
+**AI-native agent-based modeling framework.**
 
-## Core Design Philosophy
+**S**imulate. **T**est. **A**nalyze. **N**arrate.
 
-- **Functional, Not Object-Oriented**: No classes, inheritance, or complex OOP patterns
-- **Documentation-First**: All documentation fits in system prompt space
-- **JSON-Native Configuration**: Simple dictionaries for all configuration
-- **Template-Heavy Approach**: Pre-built rule templates for common ABM patterns
+```bash
+pip install agentstan
+```
 
 ## Quick Start
 
 ```python
-import llm_abm as abm
+from agentstan import Simulation
 
-# Create model from simple config
-config = {
-    "grid": {"width": 50, "height": 50},
-    "agents": {
-        "rabbit": {"count": 100, "energy": 20},
-        "wolf": {"count": 20, "energy": 40}
-    }
-}
-
-model = abm.create_model(config)
-
-# Add behavioral rules
-model = abm.add_rule(model, "random_movement", {})
-model = abm.add_rule(model, "predator_prey", {"predator": "wolf", "prey": "rabbit"})
-model = abm.add_rule(model, "reproduction", {"species": "rabbit", "energy_threshold": 30})
-model = abm.add_rule(model, "energy_decay", {"species": "all", "rate": 1})
-model = abm.add_rule(model, "death", {})
-
-# Run simulation
-results = abm.run(model, steps=100)
-
-# Export data
-summary = abm.export(results, format="summary")
-json_data = abm.export(results, format="json")
-csv_data = abm.export(results, format="csv")
-```
-
-## Core API (5 Functions)
-
-### `create_model(config)`
-Create model from simple config dictionary
-
-### `add_rule(model, rule_name, params={})`
-Add behavioral rule to model
-
-### `step(model)`
-Advance simulation one step
-
-### `run(model, steps=100)`
-Run simulation for multiple steps
-
-### `export(results, format="json")`
-Export data in various formats
-
-## Available Rule Templates
-
-### Movement Rules
-- `random_movement`: Move agents randomly to adjacent cells
-- `directed_movement`: Move agents toward target agent type
-
-### Interaction Rules
-- `predator_prey`: Handle predator-prey interactions with energy transfer
-- `competition`: Handle resource competition between agents
-
-### Lifecycle Rules
-- `energy_decay`: Reduce agent energy each step
-- `reproduction`: Spawn new agents when energy threshold is met
-- `death`: Handle agent death when energy reaches zero
-- `aging`: Age agents and handle death by old age
-
-## Configuration Format
-
-```python
-config = {
-    "grid": {
-        "width": 50,
-        "height": 50,
-        "topology": "torus"  # or "bounded"
-    },
-    "agents": {
+spec = {
+    "environment": {"type": "grid_2d", "dimensions": {"width": 40, "height": 40, "topology": "torus"}},
+    "agent_types": {
         "rabbit": {
-            "count": 100,
-            "energy": 20,
-            "position": "random",  # or "center"
-            "properties": {
-                "speed": 1,
-                "vision_range": 2
-            }
+            "initial_count": 80,
+            "initial_state": {"energy": 25, "perception_radius": 5},
+            "behavior_code": """
+def rabbit_behavior(agent, model, agents_nearby):
+    actions = []
+    energy = agent['energy']
+
+    if energy < 20:
+        actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': 2})
+
+    wolves = [a for a in agents_nearby if a.type == 'wolf' and a.alive]
+    if wolves:
+        w = wolves[0]['position']
+        pos = agent['position']
+        dx = 1 if pos[0] > w[0] else -1
+        dy = 1 if pos[1] > w[1] else -1
+        actions.append({'type': 'move', 'direction': [dx, dy]})
+    else:
+        actions.append({'type': 'move', 'direction': [random.choice([-1,0,1]), random.choice([-1,0,1])]})
+
+    if energy > 30 and random.random() < 0.08:
+        actions.append({'type': 'reproduce', 'energy_cost': 15, 'offspring_count': 1})
+
+    actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': -0.8})
+    if energy <= 0:
+        actions.append({'type': 'die', 'cause': 'starvation'})
+    return actions
+"""
         }
-    },
-    "environment": {
-        "carrying_capacity": 200,
-        "resource_regeneration": 0.1
     }
 }
+
+sim = Simulation(spec)
+results = sim.run(200)
+print(results["summary"]["final_counts"])
 ```
 
-## Key Features
+## The STAN Framework
 
-- **Pure Functions**: No side effects, predictable behavior
-- **Dictionary State**: All model state as simple dictionaries
-- **Rule Templates**: Pre-built behaviors for common patterns
-- **Multiple Export Formats**: JSON, CSV, and human-readable summaries
-- **Spatial Grid Support**: Torus and bounded topologies
-- **Energy-Based Lifecycle**: Built-in energy and reproduction systems
-
-## Examples
-
-See `example_predator_prey.py` for a complete working example of a classic predator-prey simulation.
-
-## Library Structure
-
-```
-llm_abm/
-├── __init__.py          # Main API functions
-├── core/
-│   ├── model.py         # Model state management
-│   ├── agent.py         # Agent data structures
-│   ├── grid.py          # Spatial management
-│   └── scheduler.py     # Step execution
-├── rules/
-│   ├── movement.py      # Movement rule templates
-│   ├── interaction.py   # Interaction rule templates
-│   └── lifecycle.py     # Birth/death rule templates
-└── utils/
-    ├── export.py        # Data export functions
-    └── validation.py    # Config validation
-```
-
-## Data Structures
-
-All state stored as simple dictionaries:
+### Simulate — Run agent-based models
 
 ```python
-# Model State
-model = {
-    "config": {...},
-    "agents": [
-        {
-            "id": 1,
-            "type": "rabbit",
-            "position": {"x": 25, "y": 30},
-            "energy": 15,
-            "age": 5,
-            "alive": True,
-            "properties": {...}
-        }
-    ],
-    "grid": {...},
-    "rules": [...],
-    "step": 0,
-    "metrics": {...}
-}
+from agentstan import Simulation, StagedScheduler, DataCollector
+
+sim = Simulation(spec, scheduler=StagedScheduler(["prey", "predator"]))
+
+collector = DataCollector(
+    model_metrics={"avg_energy": lambda s: sum(a["energy"] for a in s.agent_manager.get_living_agents()) / max(s.agent_manager.get_total_count(), 1)},
+)
+sim.add_collector(collector)
+
+results = sim.run(200)
+time_series = collector.get_model_data()
 ```
 
-## LLM Optimization
+### Test — Batch runs and parameter sweeps
 
-This library is specifically designed for LLM code generation:
+```python
+from agentstan.experiment import batch_run, sweep
 
-- Complete documentation fits in system prompt space
-- No cross-references or external dependencies
-- Self-explanatory function signatures
-- Comprehensive error messages with fix suggestions
-- Copy-pasteable examples that always work
+# Run 50 times to get statistical confidence
+results = batch_run(spec, n_runs=50, steps=200)
 
-## Version
+# Sweep a parameter
+results = sweep(spec, param="agent_types.wolf.initial_count", values=range(5, 50, 5), n_runs=10)
+for val, runs in results.items():
+    avg = sum(r["summary"]["final_counts"].get("wolf", 0) for r in runs) / len(runs)
+    print(f"wolves={val}: avg final = {avg:.1f}")
+```
 
-0.1.0 - MVP Core Implementation
+### Analyze — Understand what happened
+
+```python
+from agentstan.analysis import analyze_population, analyze_events
+
+pop_report = analyze_population(results)
+# {'agent_types': {'rabbit': {'stability': 'oscillating', 'period': 34, ...}}}
+
+event_report = analyze_events(results)
+# {'deaths': {'by_cause': {'starvation': 42, 'predation': 18}, ...}}
+```
+
+### Narrate — AI explains the results
+
+```python
+# pip install agentstan[ai]
+from agentstan.ai import generate, interpret, validate
+
+# Generate a model from natural language
+spec = generate("simulate wolves hunting rabbits in a forest")
+
+# Run it
+sim = Simulation(spec)
+results = sim.run(200)
+
+# AI explains what happened
+explanation = interpret(results)
+# "Rabbits peaked at step 34 then crashed due to overgrazing..."
+
+# Validate the model matches the description
+issues = validate(spec, "wolves should hunt rabbits")
+```
+
+## CLI
+
+```bash
+# Run from spec file
+agentstan --from-spec ecosystem.json --steps 200
+
+# Batch run
+agentstan --from-spec ecosystem.json --batch 50 --analyze
+
+# Generate from natural language (requires agentstan[ai])
+agentstan "simulate ants foraging for food" --steps 300
+```
+
+## Architecture
+
+```
+agentstan/
+  core/           # Simulation engine, agents, environments, schedulers
+  experiment/     # Batch runs, parameter sweeps
+  analysis/       # Population dynamics, event analysis
+  ai/             # LLM-powered generation, interpretation, validation
+```
 
 ## License
 
-See LICENSE file for details.
+BSD 3-Clause

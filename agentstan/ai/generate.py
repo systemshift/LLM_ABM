@@ -7,7 +7,7 @@ import re
 from typing import Dict, Any, Optional
 
 from .prompt import get_system_prompt
-from .core.simulation import Simulation
+from ..core.simulation import Simulation
 
 
 DEFAULT_MODEL = "gpt-5"
