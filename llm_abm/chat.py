@@ -98,7 +98,6 @@ def generate(
     model: str = DEFAULT_MODEL,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
-    temperature: float = 0.7,
 ) -> Dict[str, Any]:
     """
     Send a natural language prompt to an LLM and get back a simulation spec.
@@ -108,7 +107,6 @@ def generate(
         model: OpenAI model name (default: gpt-5)
         api_key: OpenAI API key (or set OPENAI_API_KEY env var)
         base_url: Optional API base URL for compatible endpoints
-        temperature: Sampling temperature
 
     Returns:
         Parsed simulation specification dict ready for create_simulation()
@@ -129,7 +127,6 @@ def generate(
             {"role": "system", "content": get_system_prompt()},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=temperature,
         response_format={"type": "json_object"},
     )
 
@@ -144,7 +141,6 @@ def run_chat(
     model: str = DEFAULT_MODEL,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
-    temperature: float = 0.7,
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -156,7 +152,6 @@ def run_chat(
         model: OpenAI model name
         api_key: OpenAI API key
         base_url: Optional API base URL
-        temperature: Sampling temperature
         verbose: Print progress info
 
     Returns:
@@ -171,7 +166,6 @@ def run_chat(
         model=model,
         api_key=api_key,
         base_url=base_url,
-        temperature=temperature,
     )
 
     if verbose:
@@ -255,7 +249,6 @@ class ChatSession:
         response = client.chat.completions.create(
             model=self.model,
             messages=self.messages,
-            temperature=0.7,
             response_format={"type": "json_object"},
         )
 
