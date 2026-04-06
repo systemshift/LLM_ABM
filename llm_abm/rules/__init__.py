@@ -1,3 +1,0 @@
-"""
-Rule templates package
-"""

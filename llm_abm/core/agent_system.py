@@ -72,6 +72,18 @@ class Agent:
         current = self.get_attribute(name, 0)
         self.set_attribute(name, current + delta)
 
+    def __getitem__(self, key: str) -> Any:
+        """Dict-style access: agent['energy']"""
+        return self.state[key]
+
+    def __setitem__(self, key: str, value: Any):
+        """Dict-style assignment: agent['energy'] = 10"""
+        self.state[key] = value
+
+    def __contains__(self, key: str) -> bool:
+        """Support 'in' operator: 'energy' in agent"""
+        return key in self.state
+
     def kill(self):
         """Mark agent as dead"""
         self.alive = False
@@ -194,7 +206,7 @@ class AgentManager:
         return sum(1 for a in self.agents if a.alive)
 
     def reset(self):
-        """Clear all agents"""
+        """Clear all agents and reset ID counter"""
         self.agents = []
         self.agents_by_type = {}
         Agent._next_id = 1
