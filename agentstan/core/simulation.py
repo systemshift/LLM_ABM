@@ -41,6 +41,10 @@ class Simulation:
 
         self._create_agents()
 
+        # Optional systems (attached after init)
+        self.intervention_engine = None
+        self.llm_engine = None
+
         self.metrics = {
             "initial_agents": self.agent_manager.get_total_count(),
             "initial_counts": self.agent_manager.get_counts(),
@@ -50,6 +54,18 @@ class Simulation:
     def add_collector(self, collector) -> None:
         """Attach a DataCollector to this simulation."""
         self.collectors.append(collector)
+
+    def add_observer(self, observer) -> None:
+        """Attach an Observer (also registers as collector)."""
+        self.collectors.append(observer)
+
+    def attach_intervention_engine(self, engine) -> None:
+        """Attach an InterventionEngine for mid-simulation modifications."""
+        self.intervention_engine = engine
+
+    def attach_llm_engine(self, engine) -> None:
+        """Attach an LLMBehaviorEngine for LLM-powered agents."""
+        self.llm_engine = engine
 
     def _create_environment(self) -> Environment:
         env_spec = self.spec.get("environment", {})
@@ -120,6 +136,14 @@ class Simulation:
         """Execute one simulation step."""
         self.step += 1
         self.environment.update(self.step)
+
+        # Apply queued interventions from previous cycle
+        if self.intervention_engine:
+            self.intervention_engine.apply_pending()
+
+        # Pre-compute LLM agent decisions in batch
+        if self.llm_engine:
+            self.llm_engine.prepare_batch(self)
 
         agents = self.scheduler.get_agents(self.agent_manager)
         simultaneous = getattr(self.scheduler, "simultaneous", False)
