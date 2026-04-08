@@ -3,7 +3,7 @@ Predator-Prey (Lotka-Volterra) Model
 
 Wolves hunt rabbits. Rabbits graze for energy. Both reproduce when
 energy is high. Classic oscillating population dynamics emerge:
-rabbits boom → wolves boom → rabbits crash → wolves crash → repeat.
+rabbits boom -> wolves boom -> rabbits decline -> wolves decline.
 
 Try varying wolf count, predation success rate, or energy decay
 to find stable vs unstable parameter regions.
@@ -20,13 +20,17 @@ def rabbit_behavior(agent, model, agents_nearby):
     position = agent['position']
 
     # Graze for energy
-    if energy < 20:
-        actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': 2.0})
+    if energy < 22:
+        actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': 2.5})
 
     # Flee from wolves
     wolves = [a for a in agents_nearby if a.type == 'wolf' and a.alive]
     if wolves:
-        w = wolves[0]['position']
+        def wdist(w):
+            wp = w['position']
+            return abs(position[0] - wp[0]) + abs(position[1] - wp[1])
+        nearest = min(wolves, key=wdist)
+        w = nearest['position']
         dx = 1 if position[0] > w[0] else -1
         dy = 1 if position[1] > w[1] else -1
         actions.append({'type': 'move', 'direction': [dx, dy]})
@@ -34,11 +38,11 @@ def rabbit_behavior(agent, model, agents_nearby):
         actions.append({'type': 'move', 'direction': [random.choice([-1,0,1]), random.choice([-1,0,1])]})
 
     # Reproduce
-    if energy > 30 and random.random() < 0.08:
-        actions.append({'type': 'reproduce', 'energy_cost': 14, 'offspring_count': 1})
+    if energy > 24 and random.random() < 0.08:
+        actions.append({'type': 'reproduce', 'energy_cost': 10, 'offspring_count': 1})
 
     # Metabolism
-    actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': -0.8})
+    actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': -0.6})
 
     if energy <= 0:
         actions.append({'type': 'die', 'cause': 'starvation'})
@@ -52,28 +56,33 @@ def wolf_behavior(agent, model, agents_nearby):
     energy = agent['energy']
     position = agent['position']
 
-    # Hunt rabbits
+    # Hunt rabbits — attack if adjacent, otherwise chase
     rabbits = [a for a in agents_nearby if a.type == 'rabbit' and a.alive]
     if rabbits:
-        prey = rabbits[0]
+        def dist(r):
+            rp = r['position']
+            return abs(position[0] - rp[0]) + abs(position[1] - rp[1])
+        prey = min(rabbits, key=dist)
         prey_pos = prey['position']
-        if position == prey_pos:
+        d = dist(prey)
+
+        if d <= 1:
             actions.append({
                 'type': 'interact', 'target_id': prey.id,
                 'interaction_type': 'predation',
-                'params': {'success_rate': 0.4, 'energy_gain': 12}
+                'params': {'success_rate': 0.4, 'energy_gain': 20}
             })
-        else:
-            actions.append({'type': 'move_to', 'target': (prey_pos[0], prey_pos[1])})
+        # Chase toward prey
+        actions.append({'type': 'move_to', 'target': (prey_pos[0], prey_pos[1])})
     else:
         actions.append({'type': 'move', 'direction': [random.choice([-1,0,1]), random.choice([-1,0,1])]})
 
     # Reproduce
-    if energy > 50 and random.random() < 0.04:
+    if energy > 45 and random.random() < 0.04:
         actions.append({'type': 'reproduce', 'energy_cost': 20, 'offspring_count': 1})
 
     # Metabolism
-    actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': -1.0})
+    actions.append({'type': 'modify_state', 'attribute': 'energy', 'delta': -0.8})
 
     if energy <= 0:
         actions.append({'type': 'die', 'cause': 'starvation'})
@@ -84,17 +93,17 @@ def wolf_behavior(agent, model, agents_nearby):
 spec = {
     "environment": {
         "type": "grid_2d",
-        "dimensions": {"width": 40, "height": 40, "topology": "torus"},
+        "dimensions": {"width": 30, "height": 30, "topology": "torus"},
     },
     "agent_types": {
         "rabbit": {
             "initial_count": 80,
-            "initial_state": {"energy": 25, "perception_radius": 5},
+            "initial_state": {"energy": 25, "perception_radius": 4},
             "behavior_code": rabbit_code,
         },
         "wolf": {
             "initial_count": 15,
-            "initial_state": {"energy": 40, "perception_radius": 7},
+            "initial_state": {"energy": 50, "perception_radius": 6},
             "behavior_code": wolf_code,
         },
     },
@@ -103,7 +112,7 @@ spec = {
 
 def run_single():
     print("=== Predator-Prey Model ===")
-    print("80 rabbits, 15 wolves, 40x40 grid")
+    print("80 rabbits, 15 wolves, 30x30 grid")
     print()
 
     sim = Simulation(spec)
@@ -152,7 +161,7 @@ def run_wolf_sweep():
         param="agent_types.wolf.initial_count",
         values=[5, 10, 15, 20, 30],
         steps=200,
-        n_runs=5,
+        n_runs=3,
         max_workers=4,
     )
 
