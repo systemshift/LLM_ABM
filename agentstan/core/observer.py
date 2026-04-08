@@ -133,10 +133,12 @@ class Observer:
         watch_agents: Optional[List[int]] = None,
         watch_types: Optional[List[str]] = None,
         every_n_steps: int = 1,
+        max_history: int = 500,
     ):
         self.watch_agents = watch_agents
         self.watch_types = watch_types
         self.every_n_steps = every_n_steps
+        self.max_history = max_history
         self.history: List[SimulationSnapshot] = []
         self.callbacks: List[Callable[["SimulationSnapshot"], None]] = []
 
@@ -157,6 +159,10 @@ class Observer:
 
         snapshot = SimulationSnapshot.from_simulation(simulation, agent_ids)
         self.history.append(snapshot)
+
+        # Evict oldest if over cap
+        if len(self.history) > self.max_history:
+            self.history = self.history[-self.max_history:]
 
         for cb in self.callbacks:
             cb(snapshot)

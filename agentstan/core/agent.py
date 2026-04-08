@@ -3,7 +3,10 @@ Dynamic agent system with flexible attributes and behaviors
 """
 
 import copy
+import logging
 from typing import Dict, Any, List, Optional, Callable
+
+logger = logging.getLogger("agentstan")
 
 
 class Agent:
@@ -56,7 +59,7 @@ class Agent:
             return actions if actions else []
         except Exception as e:
             # Log error but don't crash simulation
-            print(f"Error in agent {self.id} behavior: {e}")
+            logger.warning(f"Error in agent {self.id} behavior: {e}")
             return []
 
     def get_attribute(self, name: str, default: Any = None) -> Any:
@@ -110,19 +113,61 @@ class Agent:
         return f"Agent(id={self.id}, type={self.type}, alive={self.alive})"
 
 
+class SpatialHash:
+    """Grid-based spatial index for fast proximity queries. O(n) instead of O(n^2)."""
+
+    def __init__(self, cell_size: float = 5.0):
+        self.cell_size = cell_size
+        self.cells: Dict[tuple, List[Agent]] = {}
+
+    def _key(self, position) -> tuple:
+        if position is None:
+            return (None, None)
+        x, y = position
+        return (int(x // self.cell_size), int(y // self.cell_size))
+
+    def rebuild(self, agents: List['Agent']) -> None:
+        """Rebuild the index from scratch. Call once per step."""
+        self.cells.clear()
+        for agent in agents:
+            if not agent.alive:
+                continue
+            pos = agent.state.get("position")
+            if pos is None:
+                continue
+            key = self._key(pos)
+            if key not in self.cells:
+                self.cells[key] = []
+            self.cells[key].append(agent)
+
+    def query(self, position, radius: float) -> List['Agent']:
+        """Return agents within radius of position."""
+        if position is None:
+            return []
+        cx, cy = self._key(position)
+        r = int(radius // self.cell_size) + 1
+        result = []
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                cell = self.cells.get((cx + dx, cy + dy))
+                if cell:
+                    result.extend(cell)
+        return result
+
+
 class AgentManager:
-    """
-    Manages all agents in a simulation
-    """
+    """Manages all agents in a simulation."""
 
     def __init__(self):
-        """Initialize agent manager"""
         self.agents: List[Agent] = []
         self.agents_by_type: Dict[str, List[Agent]] = {}
+        self._spatial_hash = SpatialHash()
+        self._agents_by_id: Dict[int, Agent] = {}
 
     def add_agent(self, agent: Agent):
         """Add an agent to the simulation"""
         self.agents.append(agent)
+        self._agents_by_id[agent.id] = agent
 
         if agent.type not in self.agents_by_type:
             self.agents_by_type[agent.type] = []
@@ -132,15 +177,13 @@ class AgentManager:
         """Remove an agent from the simulation"""
         if agent in self.agents:
             self.agents.remove(agent)
+        self._agents_by_id.pop(agent.id, None)
         if agent.type in self.agents_by_type and agent in self.agents_by_type[agent.type]:
             self.agents_by_type[agent.type].remove(agent)
 
     def get_agent(self, agent_id: int) -> Optional[Agent]:
-        """Get agent by ID"""
-        for agent in self.agents:
-            if agent.id == agent_id:
-                return agent
-        return None
+        """Get agent by ID (O(1) via index)"""
+        return self._agents_by_id.get(agent_id)
 
     def get_living_agents(self) -> List[Agent]:
         """Get all living agents"""
@@ -157,20 +200,25 @@ class AgentManager:
             if a.alive and a.state.get("position") == position
         ]
 
+    def rebuild_spatial_index(self) -> None:
+        """Rebuild spatial hash. Call once per step before proximity queries."""
+        self._spatial_hash.rebuild(self.agents)
+
     def get_agents_near_position(self, position: Any, radius: float,
                                  environment) -> List[Agent]:
-        """Get all living agents within radius of position"""
+        """Get all living agents within radius of position (uses spatial hash)."""
+        # Get candidates from spatial hash (fast broad-phase)
+        candidates = self._spatial_hash.query(position, radius)
+
+        # Filter by exact distance (narrow-phase)
         nearby = []
-        for agent in self.agents:
+        for agent in candidates:
             if not agent.alive:
                 continue
-
             agent_pos = agent.state.get("position")
             if agent_pos is None:
                 continue
-
-            dist = environment.distance(position, agent_pos)
-            if dist <= radius:
+            if environment.distance(position, agent_pos) <= radius:
                 nearby.append(agent)
 
         return nearby
@@ -188,6 +236,9 @@ class AgentManager:
 
     def cleanup_dead_agents(self):
         """Remove dead agents from active lists"""
+        dead_ids = [a.id for a in self.agents if not a.alive]
+        for aid in dead_ids:
+            self._agents_by_id.pop(aid, None)
         self.agents = [a for a in self.agents if a.alive]
         for agent_type in self.agents_by_type:
             self.agents_by_type[agent_type] = [
@@ -209,6 +260,8 @@ class AgentManager:
         """Clear all agents and reset ID counter"""
         self.agents = []
         self.agents_by_type = {}
+        self._agents_by_id = {}
+        self._spatial_hash = SpatialHash()
         Agent._next_id = 1
 
     def to_dict(self) -> Dict[str, Any]:

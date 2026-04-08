@@ -55,6 +55,8 @@ class ActionProcessor:
                 self._process_die(agent, action, step)
             elif action_type == "modify_state":
                 self._process_modify_state(agent, action, step)
+            elif action_type == "transform":
+                self._process_transform(agent, action, step)
             elif action_type == "custom":
                 self._process_custom(agent, action, step)
             else:
@@ -303,6 +305,50 @@ class ActionProcessor:
             old_value=old_value,
             new_value=new_value,
             cause="modify_state_action"
+        )
+
+    def _process_transform(self, agent: Agent, action: Dict, step: int):
+        """Transform agent into a different type.
+
+        Action format:
+            {"type": "transform", "new_type": "infected",
+             "new_state": {"days_infected": 0}}
+        """
+        new_type = action.get("new_type")
+        new_state = action.get("new_state", {})
+
+        if not new_type:
+            return
+
+        old_type = agent.type
+
+        # Kill old agent
+        agent.kill()
+        self.logger.log_agent_death(
+            step=step, agent_id=agent.id,
+            agent_type=old_type, cause=f"transformed_to_{new_type}",
+        )
+
+        # Create new agent at same position
+        import copy
+        merged_state = copy.deepcopy(agent.state)
+        merged_state.update(new_state)
+
+        # Look up behavior for the new type from the simulation spec
+        # The behavior_code comes from new_state or needs to be compiled externally
+        behavior_code = action.get("behavior_code", "")
+        behavior_func = None
+
+        new_agent = Agent(
+            agent_type=new_type,
+            initial_state=merged_state,
+            behavior_function=behavior_func,
+        )
+        self.agent_manager.add_agent(new_agent)
+
+        self.logger.log_agent_birth(
+            step=step, parent_id=agent.id,
+            child_id=new_agent.id, agent_type=new_type,
         )
 
     def _process_custom(self, agent: Agent, action: Dict, step: int):

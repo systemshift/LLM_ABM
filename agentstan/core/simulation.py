@@ -4,6 +4,7 @@ Core simulation engine.
 
 import copy
 import time
+import logging
 from typing import Dict, Any, List, Optional, Callable
 
 from .environment import Environment
@@ -11,6 +12,8 @@ from .agent import Agent, AgentManager
 from .actions import ActionProcessor
 from .logger import EventLogger
 from .scheduler import RandomScheduler
+
+log = logging.getLogger("agentstan")
 
 
 class Simulation:
@@ -23,6 +26,7 @@ class Simulation:
     """
 
     def __init__(self, specification: Dict[str, Any], scheduler=None):
+        self._validate_spec(specification)
         self.spec = specification
         self.step = 0
         self.scheduler = scheduler or RandomScheduler()
@@ -66,6 +70,43 @@ class Simulation:
     def attach_llm_engine(self, engine) -> None:
         """Attach an LLMBehaviorEngine for LLM-powered agents."""
         self.llm_engine = engine
+
+    @staticmethod
+    def _validate_spec(spec: Dict[str, Any]) -> None:
+        """Validate specification with clear error messages."""
+        if not isinstance(spec, dict):
+            raise ValueError(f"Specification must be a dict, got {type(spec).__name__}")
+
+        if "environment" not in spec:
+            raise ValueError(
+                "Specification missing 'environment'. Expected: "
+                '{"environment": {"type": "grid_2d", "dimensions": {"width": N, "height": N}}, "agent_types": {...}}'
+            )
+
+        env = spec["environment"]
+        if "type" not in env:
+            raise ValueError("environment missing 'type'. Options: 'grid_2d', 'continuous_2d', 'network'")
+        if "dimensions" not in env:
+            raise ValueError("environment missing 'dimensions'. Expected: {'width': N, 'height': N}")
+
+        if "agent_types" not in spec:
+            raise ValueError(
+                "Specification missing 'agent_types'. Expected: "
+                '{"agent_types": {"name": {"initial_count": N, "initial_state": {...}, "behavior_code": "..."}}}'
+            )
+
+        agent_types = spec["agent_types"]
+        if not agent_types:
+            raise ValueError("agent_types is empty — define at least one agent type")
+
+        for name, config in agent_types.items():
+            if not isinstance(config, dict):
+                raise ValueError(f"agent_types['{name}'] must be a dict")
+            if "initial_count" not in config:
+                raise ValueError(f"agent_types['{name}'] missing 'initial_count'")
+            count = config["initial_count"]
+            if not isinstance(count, int) or count < 0:
+                raise ValueError(f"agent_types['{name}'].initial_count must be a non-negative integer, got {count}")
 
     def _create_environment(self) -> Environment:
         env_spec = self.spec.get("environment", {})
@@ -140,6 +181,9 @@ class Simulation:
         # Apply queued interventions from previous cycle
         if self.intervention_engine:
             self.intervention_engine.apply_pending()
+
+        # Rebuild spatial index for fast proximity queries
+        self.agent_manager.rebuild_spatial_index()
 
         # Pre-compute LLM agent decisions in batch
         if self.llm_engine:
@@ -261,3 +305,62 @@ class Simulation:
             "agents": self.agent_manager.to_dict(),
             "metrics": self.metrics,
         }
+
+    def save(self, path: str) -> None:
+        """Save simulation state to a JSON file for later resuming."""
+        import json
+        checkpoint = {
+            "spec": self.spec,
+            "step": self.step,
+            "agents": [
+                {"type": a.type, "alive": a.alive, "state": a.state}
+                for a in self.agent_manager.agents
+            ],
+            "environment_properties": self.environment.properties,
+            "metrics": self.metrics,
+        }
+        with open(path, "w") as f:
+            json.dump(checkpoint, f, indent=2, default=str)
+
+    @classmethod
+    def load(cls, path: str) -> "Simulation":
+        """Load a saved simulation and resume from where it left off."""
+        import json
+        import copy
+        from .agent import Agent
+
+        with open(path) as f:
+            checkpoint = json.load(f)
+
+        sim = cls(checkpoint["spec"])
+
+        # Restore step counter
+        sim.step = checkpoint["step"]
+
+        # Restore agents from checkpoint (replacing the ones __init__ created)
+        sim.agent_manager.reset()
+        Agent._next_id = 1
+
+        behavior_cache = {}
+        for agent_data in checkpoint["agents"]:
+            agent_type = agent_data["type"]
+            if agent_type not in behavior_cache:
+                code = checkpoint["spec"].get("agent_types", {}).get(agent_type, {}).get("behavior_code", "")
+                behavior_cache[agent_type] = sim._compile_behavior_function(agent_type, code) if code else None
+
+            agent = Agent(
+                agent_type=agent_type,
+                initial_state=copy.deepcopy(agent_data["state"]),
+                behavior_function=behavior_cache[agent_type],
+            )
+            agent.alive = agent_data["alive"]
+            sim.agent_manager.add_agent(agent)
+
+        # Restore environment properties
+        for k, v in checkpoint.get("environment_properties", {}).items():
+            sim.environment.set_property(k, v)
+
+        # Restore metrics
+        sim.metrics = checkpoint["metrics"]
+
+        return sim

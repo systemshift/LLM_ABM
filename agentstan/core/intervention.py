@@ -7,8 +7,11 @@ that are safely applied between simulation steps.
 
 import threading
 import copy
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Callable, Tuple
+
+logger = logging.getLogger("agentstan")
 
 
 @dataclass
@@ -116,7 +119,7 @@ class InterventionEngine:
                 self.history.append((self.simulation.step, intervention))
                 applied.append(intervention)
             except Exception as e:
-                print(f"Intervention failed: {intervention.type} - {e}")
+                logger.error(f"Intervention failed: {intervention.type} - {e}")
 
         return applied
 

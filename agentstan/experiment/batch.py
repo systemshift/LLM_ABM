@@ -41,6 +41,7 @@ def batch_run(
     steps: int = 200,
     vary: Optional[Dict[str, list]] = None,
     max_workers: int = 4,
+    output_file: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Run a model many times, optionally varying parameters.
@@ -90,13 +91,34 @@ def batch_run(
 
     # Execute
     results = []
+    out_file = None
+    if output_file:
+        out_file = open(output_file, "w")
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(_run_one, s, st, rid, p): rid
             for s, st, rid, p in jobs
         }
         for future in as_completed(futures):
-            results.append(future.result())
+            result = future.result()
+            if out_file:
+                # Stream to JSONL — don't hold history in memory
+                import json
+                compact = {
+                    "run_id": result["run_id"],
+                    "params": result["params"],
+                    "summary": result["summary"],
+                    "final_step": result["final_step"],
+                    "duration": result["duration"],
+                }
+                out_file.write(json.dumps(compact, default=str) + "\n")
+                # Strip history from in-memory result to save RAM
+                result.pop("history", None)
+            results.append(result)
+
+    if out_file:
+        out_file.close()
 
     results.sort(key=lambda r: r["run_id"])
     return results
