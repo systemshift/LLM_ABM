@@ -143,7 +143,7 @@ class LLMBehaviorEngine:
     Manages LLM-based agent behavior with batched execution.
 
     Usage:
-        engine = LLMBehaviorEngine(model="gpt-5", budget=LLMBudget(max_calls_total=500))
+        engine = LLMBehaviorEngine(model="gpt-5.5", budget=LLMBudget(max_calls_total=500))
         behavior = engine.create_behavior(personality="aggressive hunter", goals="hunt prey")
         for wolf in sim.agent_manager.get_agents_by_type("wolf"):
             wolf.behavior_function = behavior
@@ -152,7 +152,7 @@ class LLMBehaviorEngine:
 
     def __init__(
         self,
-        model: str = "gpt-5",
+        model: str = "gpt-5.5",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         budget: Optional[LLMBudget] = None,

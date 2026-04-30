@@ -13,7 +13,7 @@ def main():
         description="AgentStan: AI-native agent-based modeling. Simulate, Test, Analyze, Narrate.",
     )
     parser.add_argument("prompt", nargs="?", help="Natural language simulation description")
-    parser.add_argument("--model", default="gpt-5", help="OpenAI model (default: gpt-5)")
+    parser.add_argument("--model", default="gpt-5.5", help="OpenAI model (default: gpt-5.5)")
     parser.add_argument("--steps", type=int, default=200, help="Simulation steps (default: 200)")
     parser.add_argument("--output", "-o", default=None, help="Output file (JSON)")
     parser.add_argument("--from-spec", default=None, help="Run from existing spec JSON file")

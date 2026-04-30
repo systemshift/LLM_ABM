@@ -10,7 +10,7 @@ from .prompt import get_system_prompt
 from ..core.simulation import Simulation
 
 
-DEFAULT_MODEL = "gpt-5"
+DEFAULT_MODEL = "gpt-5.5"
 
 
 def _extract_json(text: str) -> Dict[str, Any]:

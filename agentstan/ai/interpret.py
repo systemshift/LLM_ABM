@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any, Optional
 
 
-DEFAULT_MODEL = "gpt-5"
+DEFAULT_MODEL = "gpt-5.5"
 
 
 def interpret(

@@ -51,7 +51,7 @@ class Steerer:
         self,
         goal: str,
         check_every: int = 20,
-        model: str = "gpt-5",
+        model: str = "gpt-5.5",
         api_key: Optional[str] = None,
         max_interventions_per_check: int = 3,
     ):

@@ -48,7 +48,7 @@ def create_app(cors_origins=None, api_key=None):
 
     # Store config on app
     app.config["OPENAI_API_KEY"] = api_key or os.getenv("OPENAI_API_KEY")
-    app.config["OPENAI_MODEL"] = os.getenv("OPENAI_MODEL", "gpt-5")
+    app.config["OPENAI_MODEL"] = os.getenv("OPENAI_MODEL", "gpt-5.5")
 
     # --- Health ---
 
