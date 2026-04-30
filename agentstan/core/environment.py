@@ -62,18 +62,64 @@ class Environment:
         self.bounded = self.dimensions.get("bounded", True)
 
     def _init_network(self):
-        """Initialize network/graph environment"""
-        self.nodes = {}
-        self.edges = []
+        """Initialize network/graph environment.
 
-        # Create nodes from dimensions
+        Supported dimensions:
+          - node_count: number of nodes (default 50)
+          - edges: list of [a, b] pairs for explicit edges
+          - topology: "complete" | "ring" | "lattice" | "random"
+          - edge_probability: float (used by "random" topology, default 0.1)
+          - lattice_dims: [rows, cols] (used by "lattice" topology)
+        """
+        self.nodes: Dict[int, Dict[str, Any]] = {}
+        self.edges: List[Tuple[int, int]] = []
+        self._adjacency: Dict[int, set] = {}
+
         node_count = self.dimensions.get("node_count", 50)
         for i in range(node_count):
-            self.nodes[i] = {
-                "id": i,
-                "agents": [],
-                "properties": {}
-            }
+            self.nodes[i] = {"id": i, "agents": [], "properties": {}}
+            self._adjacency[i] = set()
+
+        for pair in self.dimensions.get("edges", []) or []:
+            if len(pair) == 2:
+                self.add_edge(pair[0], pair[1])
+
+        topology = self.dimensions.get("topology")
+        if topology == "complete":
+            for i in range(node_count):
+                for j in range(i + 1, node_count):
+                    self.add_edge(i, j)
+        elif topology == "ring":
+            for i in range(node_count):
+                self.add_edge(i, (i + 1) % node_count)
+        elif topology == "lattice":
+            rows, cols = self.dimensions.get("lattice_dims", [0, 0])
+            if rows * cols == node_count:
+                for r in range(rows):
+                    for c in range(cols):
+                        node = r * cols + c
+                        if c + 1 < cols:
+                            self.add_edge(node, r * cols + c + 1)
+                        if r + 1 < rows:
+                            self.add_edge(node, (r + 1) * cols + c)
+        elif topology == "random":
+            edge_prob = self.dimensions.get("edge_probability", 0.1)
+            for i in range(node_count):
+                for j in range(i + 1, node_count):
+                    if random.random() < edge_prob:
+                        self.add_edge(i, j)
+
+    def add_edge(self, a: int, b: int) -> None:
+        """Add an undirected edge between two nodes."""
+        if self.env_type != "network":
+            raise ValueError("add_edge only valid for network environments")
+        if a not in self.nodes or b not in self.nodes:
+            raise ValueError(f"Unknown node(s): {a}, {b}")
+        if a == b or b in self._adjacency[a]:
+            return
+        self.edges.append((a, b))
+        self._adjacency[a].add(b)
+        self._adjacency[b].add(a)
 
     def _init_custom(self):
         """Initialize custom environment type"""
@@ -140,14 +186,26 @@ class Environment:
         return neighbors
 
     def _get_network_neighbors(self, node_id: int) -> List[int]:
-        """Get connected nodes in network"""
-        neighbors = []
-        for edge in self.edges:
-            if edge[0] == node_id:
-                neighbors.append(edge[1])
-            elif edge[1] == node_id:
-                neighbors.append(edge[0])
-        return neighbors
+        """Get directly connected nodes in network (1-hop)."""
+        return list(self._adjacency.get(node_id, ()))
+
+    def get_nodes_within_hops(self, node_id: int, hops: int) -> List[int]:
+        """BFS: nodes reachable within `hops` edges (excludes the node itself)."""
+        if node_id not in self._adjacency or hops < 1:
+            return []
+        visited = {node_id}
+        frontier = {node_id}
+        for _ in range(hops):
+            next_frontier = set()
+            for n in frontier:
+                next_frontier.update(self._adjacency.get(n, ()))
+            next_frontier -= visited
+            if not next_frontier:
+                break
+            visited.update(next_frontier)
+            frontier = next_frontier
+        visited.discard(node_id)
+        return list(visited)
 
     def distance(self, pos1: Any, pos2: Any) -> float:
         """
@@ -180,9 +238,26 @@ class Environment:
             return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
 
         elif self.env_type == "network":
-            # For networks, distance is graph distance (would need path finding)
-            # Simplified: just check if connected
-            return 1 if pos2 in self._get_network_neighbors(pos1) else float('inf')
+            # Graph distance via BFS, capped at node count.
+            if pos1 == pos2:
+                return 0
+            if pos1 not in self._adjacency:
+                return float("inf")
+            visited = {pos1}
+            frontier = {pos1}
+            depth = 0
+            while frontier:
+                depth += 1
+                next_frontier = set()
+                for n in frontier:
+                    for m in self._adjacency.get(n, ()):
+                        if m == pos2:
+                            return depth
+                        if m not in visited:
+                            visited.add(m)
+                            next_frontier.add(m)
+                frontier = next_frontier
+            return float("inf")
 
         return 0
 

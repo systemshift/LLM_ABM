@@ -4,7 +4,7 @@ Action processor for handling agent actions and interactions
 
 import random
 import copy
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from .agent import Agent, AgentManager
 from .environment import Environment
 from .logger import EventLogger
@@ -16,7 +16,8 @@ class ActionProcessor:
     """
 
     def __init__(self, agent_manager: AgentManager, environment: Environment,
-                 logger: EventLogger):
+                 logger: EventLogger,
+                 behavior_resolver: Optional[Callable[[str], Optional[Callable]]] = None):
         """
         Initialize action processor
 
@@ -24,10 +25,13 @@ class ActionProcessor:
             agent_manager: Agent management system
             environment: Environment system
             logger: Event logger
+            behavior_resolver: Optional callable agent_type -> behavior_function,
+                used by the transform action to look up behavior from the spec.
         """
         self.agent_manager = agent_manager
         self.environment = environment
         self.logger = logger
+        self.behavior_resolver = behavior_resolver
 
     def process_actions(self, agent: Agent, actions: List[Dict[str, Any]], step: int):
         """
@@ -313,6 +317,10 @@ class ActionProcessor:
         Action format:
             {"type": "transform", "new_type": "infected",
              "new_state": {"days_infected": 0}}
+
+        Behavior for ``new_type`` is resolved from the simulation spec via
+        the ``behavior_resolver`` passed to ``ActionProcessor``. An action may
+        override that with an explicit ``behavior_code`` (rare, dynamic case).
         """
         new_type = action.get("new_type")
         new_state = action.get("new_state", {})
@@ -321,23 +329,27 @@ class ActionProcessor:
             return
 
         old_type = agent.type
+        old_id = agent.id
 
-        # Kill old agent
-        agent.kill()
-        self.logger.log_agent_death(
-            step=step, agent_id=agent.id,
-            agent_type=old_type, cause=f"transformed_to_{new_type}",
-        )
-
-        # Create new agent at same position
-        import copy
+        # Snapshot state before mutation
         merged_state = copy.deepcopy(agent.state)
         merged_state.update(new_state)
 
-        # Look up behavior for the new type from the simulation spec
-        # The behavior_code comes from new_state or needs to be compiled externally
-        behavior_code = action.get("behavior_code", "")
+        # Resolve behavior: action override > spec resolver
         behavior_func = None
+        behavior_code = action.get("behavior_code", "")
+        if behavior_code:
+            from .simulation import Simulation
+            behavior_func = Simulation._compile_behavior_function(new_type, behavior_code)
+        elif self.behavior_resolver is not None:
+            behavior_func = self.behavior_resolver(new_type)
+
+        # Kill old agent (after state snapshot)
+        agent.kill()
+        self.logger.log_agent_death(
+            step=step, agent_id=old_id,
+            agent_type=old_type, cause=f"transformed_to_{new_type}",
+        )
 
         new_agent = Agent(
             agent_type=new_type,
@@ -347,7 +359,7 @@ class ActionProcessor:
         self.agent_manager.add_agent(new_agent)
 
         self.logger.log_agent_birth(
-            step=step, parent_id=agent.id,
+            step=step, parent_id=old_id,
             child_id=new_agent.id, agent_type=new_type,
         )
 

@@ -120,10 +120,13 @@ class SpatialHash:
         self.cell_size = cell_size
         self.cells: Dict[tuple, List[Agent]] = {}
 
-    def _key(self, position) -> tuple:
+    def _key(self, position) -> Optional[tuple]:
         if position is None:
-            return (None, None)
-        x, y = position
+            return None
+        try:
+            x, y = position
+        except (TypeError, ValueError):
+            return None
         return (int(x // self.cell_size), int(y // self.cell_size))
 
     def rebuild(self, agents: List['Agent']) -> None:
@@ -133,9 +136,9 @@ class SpatialHash:
             if not agent.alive:
                 continue
             pos = agent.state.get("position")
-            if pos is None:
-                continue
             key = self._key(pos)
+            if key is None:
+                continue
             if key not in self.cells:
                 self.cells[key] = []
             self.cells[key].append(agent)
@@ -206,11 +209,21 @@ class AgentManager:
 
     def get_agents_near_position(self, position: Any, radius: float,
                                  environment) -> List[Agent]:
-        """Get all living agents within radius of position (uses spatial hash)."""
-        # Get candidates from spatial hash (fast broad-phase)
-        candidates = self._spatial_hash.query(position, radius)
+        """Get all living agents within radius of position.
 
-        # Filter by exact distance (narrow-phase)
+        For grid_2d / continuous_2d this uses a spatial hash with Euclidean
+        distance. For network environments, "radius" means graph hops and
+        candidates are taken from the BFS frontier.
+        """
+        if environment.env_type == "network":
+            target_nodes = set(environment.get_nodes_within_hops(position, int(radius)))
+            target_nodes.add(position)
+            return [
+                a for a in self.agents
+                if a.alive and a.state.get("position") in target_nodes
+            ]
+
+        candidates = self._spatial_hash.query(position, radius)
         nearby = []
         for agent in candidates:
             if not agent.alive:

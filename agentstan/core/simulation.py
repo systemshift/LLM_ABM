@@ -31,6 +31,7 @@ class Simulation:
         self.step = 0
         self.scheduler = scheduler or RandomScheduler()
         self.collectors = []
+        self._behavior_cache: Dict[str, Optional[Callable]] = {}
 
         # Initialize core systems
         self.environment = self._create_environment()
@@ -40,7 +41,8 @@ class Simulation:
             log_level=specification.get("log_level", "normal"),
         )
         self.action_processor = ActionProcessor(
-            self.agent_manager, self.environment, self.logger
+            self.agent_manager, self.environment, self.logger,
+            behavior_resolver=self.get_behavior,
         )
 
         self._create_agents()
@@ -118,13 +120,7 @@ class Simulation:
         for agent_type, type_spec in agent_types.items():
             initial_count = type_spec.get("initial_count", 0)
             initial_state = type_spec.get("initial_state", {})
-            behavior_code = type_spec.get("behavior_code", "")
-
-            behavior_func = None
-            if behavior_code:
-                behavior_func = self._compile_behavior_function(
-                    agent_type, behavior_code
-                )
+            behavior_func = self.get_behavior(agent_type)
 
             for _ in range(initial_count):
                 agent = Agent(
@@ -136,8 +132,22 @@ class Simulation:
                     agent.state["position"] = self.environment.get_random_position()
                 self.agent_manager.add_agent(agent)
 
+    def get_behavior(self, agent_type: str) -> Optional[Callable]:
+        """Resolve a behavior function for an agent type from the spec, cached."""
+        if agent_type in self._behavior_cache:
+            return self._behavior_cache[agent_type]
+        type_spec = self.spec.get("agent_types", {}).get(agent_type, {})
+        behavior_code = type_spec.get("behavior_code", "")
+        func = (
+            self._compile_behavior_function(agent_type, behavior_code)
+            if behavior_code else None
+        )
+        self._behavior_cache[agent_type] = func
+        return func
+
+    @staticmethod
     def _compile_behavior_function(
-        self, agent_type: str, behavior_code: str
+        agent_type: str, behavior_code: str
     ) -> Optional[Callable]:
         try:
             import random
@@ -341,17 +351,12 @@ class Simulation:
         sim.agent_manager.reset()
         Agent._next_id = 1
 
-        behavior_cache = {}
         for agent_data in checkpoint["agents"]:
             agent_type = agent_data["type"]
-            if agent_type not in behavior_cache:
-                code = checkpoint["spec"].get("agent_types", {}).get(agent_type, {}).get("behavior_code", "")
-                behavior_cache[agent_type] = sim._compile_behavior_function(agent_type, code) if code else None
-
             agent = Agent(
                 agent_type=agent_type,
                 initial_state=copy.deepcopy(agent_data["state"]),
-                behavior_function=behavior_cache[agent_type],
+                behavior_function=sim.get_behavior(agent_type),
             )
             agent.alive = agent_data["alive"]
             sim.agent_manager.add_agent(agent)
